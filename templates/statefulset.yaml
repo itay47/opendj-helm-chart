@@ -1,0 +1,136 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ template "opendj.fullname" . }}
+  labels:
+    app: {{ template "opendj.fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  serviceName: {{ template "opendj.fullname" . }}
+  replicas: {{ default 1 .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ template "opendj.fullname" . }}
+      release: {{ .Release.Name }}    
+  template:
+    metadata:
+      name: {{ include "opendj.fullname" . }}
+      labels:
+        app: {{ template "opendj.fullname" . }}
+        release: {{ .Release.Name }}
+    spec:
+      affinity:
+        podAntiAffinity:
+        {{- if eq .Values.podAntiAffinity "hard" }}
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: {{ .Values.topologyKey }}
+            labelSelector:
+                matchExpressions:
+                - key: instance
+                  operator: In
+                  values:
+                  - {{ include "opendj.fullname" . }}
+        {{- else if eq .Values.podAntiAffinity "soft" }}
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: instance
+                  operator: In
+                  values:
+                  - {{ include "opendj.fullname" . }}
+              topologyKey: {{ .Values.topologyKey }}
+        {{- end }}
+      terminationGracePeriodSeconds: 1800
+      {{- with .Values.securityContext }}
+      securityContext:
+{{ toYaml . | trim | indent 8 }}
+      {{- end }}
+      {{- if .Values.imagePullSecret }}
+      imagePullSecrets:
+      - name: {{ .Values.imagePullSecret }}
+      {{- end }}
+      containers:
+      - name: {{ include "opendj.name" . }}
+        image: {{ .Values.image }}
+        imagePullPolicy: {{ .Values.imagePullPolicy | quote }}
+        resources:
+{{ toYaml .Values.resources | trim | indent 10 }}
+        ports:
+        - containerPort: {{ default 1389 .Values.opendj.port }}
+          name: ldap
+        - containerPort: {{ default 1636 .Values.opendj.ldapsPort }} 
+          name: ldaps
+        - containerPort: 4444
+          name: admin
+        - containerPort: 8989
+          name: replication
+        volumeMounts:
+        - name: "data"
+          mountPath: "/opt/opendj/data"
+        env:
+        - name: JAVA_OPTS
+          value: "{{ .Values.javaArgs }}"
+        - name: PORT
+          value: "{{ default 1389 .Values.opendj.port }}"
+        - name: LDAPS_PORT
+          value: "{{ default 1636 .Values.opendj.ldapsPort }}"
+        - name: ADD_BASE_ENTRY
+          value: "{{ .Values.opendj.addBaseEntry }}"
+        - name: BASE_DN
+          value: "{{ .Values.opendj.baseDN }}"
+        - name: ROOT_USER_DN
+          value: "{{ .Values.opendj.rootUserDN }}"
+        {{- if .Values.useSecurity }}
+        - name: ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ template "opendj.fullname" . }}
+              key: rootPassword
+        {{- end }}
+        - name: MASTER_SERVER
+          value: {{ include "opendj.masterServer" . }}
+        - name: SECRET_VOLUME
+          value: {{ default "" .Values.opendj.secretVolume | quote }}
+        - name: OPENDJ_REPLICATION_TYPE
+          value: {{ default "" .Values.opendj.replicationType | quote }}
+        - name: OPENDJ_SSL_OPTIONS
+          value: {{ default "--generateSelfSignedCertificate" .Values.opendj.sslOptions | quote }}
+        livenessProbe:
+          tcpSocket:
+            port: {{ default 1389 .Values.opendj.port }}
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          tcpSocket:
+            port: {{ default 1389 .Values.opendj.port }}
+          initialDelaySeconds: 45
+          timeoutSeconds: 1
+      {{- if not .Values.persistence }}
+      volumes:
+      - name: data
+        emptyDir: {}
+      {{- end }}  
+  {{- if .Values.persistence }}
+  volumeClaimTemplates:
+  - metadata:
+      name: "data"
+      labels:
+        app: {{ template "opendj.fullname" . }}
+        chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+        release: "{{ .Release.Name }}"
+        heritage: "{{ .Release.Service }}"
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: {{ default "5Gi"  .Values.storageSize | quote }}
+      {{- if .Values.storageClass }}
+      storageClassName:  {{ .Values.storageClass }}
+      {{- end }}
+  {{- end }}
+  

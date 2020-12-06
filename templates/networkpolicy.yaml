@@ -1,0 +1,22 @@
+{{- if .Values.networkPolicy.enabled }}
+kind: NetworkPolicy
+apiVersion: {{ template "networkPolicy.apiVersion" . }}
+metadata:
+  name: "{{ template "opendj.fullname" . }}"
+  labels:
+    app: {{ template "opendj.fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ template "opendj.fullname" . }}
+  ingress:
+    # Allow inbound connections
+    - ports:
+      - port: 1389
+      - port: 1636
+      - port: 4444
+      - port: 8989
+{{- end }}

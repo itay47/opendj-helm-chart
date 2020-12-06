@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "opendj.fullname" . }}
+  labels:
+    app: {{ template "opendj.fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+  annotations:
+    {{- range $key, $value := .Values.service.annotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  # sessionAffinity: None
+  type: {{ .Values.service.type }}
+  {{ if eq .Values.service.type "LoadBalancer" -}} {{ if .Values.service.loadBalancerIP -}}
+  loadBalancerIP: {{ .Values.service.loadBalancerIP }}
+  {{ end -}}
+  {{- end -}}
+  {{ if eq .Values.service.type "ClusterIP" -}} {{ if .Values.service.clusterIP -}}
+  clusterIP: {{ .Values.service.clusterIP }}
+  {{ end -}}
+  {{- end -}}
+  ports:
+    - port: {{ default 1389 .Values.opendj.port }}
+      name: ldap
+      targetPort: {{ default 1389 .Values.opendj.port }}
+    - port: 4444
+      name: djadmin
+      targetPort: 4444
+    - port: {{ default 1636 .Values.opendj.ldapsPort }} 
+      name: ldaps
+      targetPort: {{ default 1636 .Values.opendj.ldapsPort }} 
+    - port: 8080
+      protocol: TCP
+      name: metrics
+  selector:
+    app: {{ template "opendj.fullname" . }}
+    release: {{ .Release.Name }}
