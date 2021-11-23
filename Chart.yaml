@@ -1,13 +1,14 @@
+apiVersion: v2
 name: opendj
-home: https://github.com/vladk1m0/opendj-helm
-engine: gotpl
+home: https://github.com/itay47/opendj-helm
 keywords:
 - opendj
 version: 4.4.3
 description: |
   OpenDJ is an LDAPv3 compliant directory service, which has been developed for the Java platform, providing a high performance, highly available, and secure store for the identities managed by your organization.
 maintainers:
-  - email: vladkimo@gmail.com
-    name: vladkimo
+  - email: itaylcars@gmail.com
+    name: Itay Shechter
 sources:
+  - https://github.com/itay47/opendj-helm
   - https://github.com/vladk1m0/opendj-helm
